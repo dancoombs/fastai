@@ -1,3 +1,60 @@
+'''Fairly basic set of tools for real-time data augmentation on image data.
+Can easily be extended to include new transformations,
+new preprocessing methods, etc...
+'''
+from __future__ import absolute_import
+from __future__ import print_function
+
+import numpy as np
+import re
+from scipy import linalg
+import scipy.ndimage as ndi
+from six.moves import range
+import os
+import threading
+import warnings
+
+from keras import backend as K
+
+def img_to_array(img, dim_ordering='default'):
+    if dim_ordering == 'default':
+        dim_ordering = K.image_dim_ordering()
+    if dim_ordering not in {'th', 'tf'}:
+        raise ValueError('Unknown dim_ordering: ', dim_ordering)
+    # Numpy array x has format (height, width, channel)
+    # or (channel, height, width)
+    # but original PIL image has format (width, height, channel)
+    x = np.asarray(img, dtype='float32')
+    if len(x.shape) == 3:
+        if dim_ordering == 'th':
+            x = x.transpose(2, 0, 1)
+    elif len(x.shape) == 2:
+        if dim_ordering == 'th':
+            x = x.reshape((1, x.shape[0], x.shape[1]))
+        else:
+            x = x.reshape((x.shape[0], x.shape[1], 1))
+    else:
+        raise ValueError('Unsupported image shape: ', x.shape)
+    return x
+
+def load_img(path, grayscale=False, target_size=None):
+    '''Load an image into PIL format.
+    # Arguments
+        path: path to image file
+        grayscale: boolean
+        target_size: None (default to original size)
+            or (img_height, img_width)
+    '''
+    from PIL import Image
+    img = Image.open(path)
+    if grayscale:
+        img = img.convert('L')
+    else:  # Ensure 3 channel even when loaded image is grayscale
+        img = img.convert('RGB')
+    if target_size:
+        img = img.resize((target_size[1], target_size[0]))
+    return img
+
 class Iterator(object):
 
     def __init__(self, N, batch_size, shuffle, seed):
@@ -149,7 +206,7 @@ class DirectoryIterator(Iterator):
             x = self.image_data_generator.random_transform(x)
             x = self.image_data_generator.standardize(x)
             batch_x[i] = x
-            batch_idx[i] = int(os.path.splitext(os.path.split(filenames[0])[1])[0])
+            batch_idx[i] = int(os.path.splitext(os.path.split(self.filenames[j])[1])[0])
         # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
@@ -171,8 +228,7 @@ class DirectoryIterator(Iterator):
         # else:
         #     return batch_x
 
-        batch_y = np.zeros([len(idx), df.shape[1]])
+        batch_y = np.zeros([len(batch_idx), self.df.shape[1]])
         for i in range(len(batch_idx)):
-            batch_y[i] = df[df['GalaxyID'] == idx[i]].as_matrix()
-
+            batch_y[i] = self.df[self.df['GalaxyID'] == batch_idx[i]].as_matrix()
         return batch_x, batch_y[:,2:]
