@@ -207,7 +207,7 @@ class DirectoryIterator(Iterator):
             x = self.image_data_generator.standardize(x)
             batch_x[i] = x
             batch_idx[i] = int(os.path.splitext(os.path.split(self.filenames[j])[1])[0])
-        # optionally save augmented images to disk for debugging purposes
+	 # optionally save augmented images to disk for debugging purposes
         if self.save_to_dir:
             for i in range(current_batch_size):
                 img = array_to_img(batch_x[i], self.dim_ordering, scale=True)
